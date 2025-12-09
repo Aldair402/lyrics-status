@@ -26,7 +26,6 @@ export class StatusChanger {
                         body: JSON.stringify({
                             "status":{
                             "text":text,
-                            "presence":"Online"
                             }
                         })
                     })
