@@ -17,18 +17,16 @@ export class StatusChanger {
 
                 public changeStatusRequest(text: string, token: string, emoji: string): Promise<Response> {
                     const now = Date.now()
-                    const request = fetch("https://discordapp.com/api/v8/users/@me/settings", {
+                    const request = fetch("https://stoat.chat/api/users/@me?", {
                         method: "PATCH",
                         headers: {
                             "Content-Type": "application/json",
-                            "Authorization": token
+                            "X-Session-Token": token
                         },
                         body: JSON.stringify({
-                            custom_status: {
-                                text,
-                                emoji_id: null,
-                                emoji_name: emoji,
-                                expires_at: new Date(Date.now() + 60000).toISOString()
+                            "status":{
+                            "text":text,
+                            "presence":"Online"
                             }
                         })
                     })
