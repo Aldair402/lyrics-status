@@ -25,13 +25,15 @@ function startServer() {
             const settings = JSON.parse(data.toString());
             Settings_1.Settings.credentials = settings.credentials;
             Settings_1.Settings.view = settings.view;
-            Settings_1.Settings.timings = settings.timings;
+            Settings_1.Settings.translation = settings.translation,
+                Settings_1.Settings.timings = settings.timings;
             Settings_1.Settings.update = settings.update;
             Settings_1.Settings.save();
         });
         ws.send(JSON.stringify({
             credentials: Settings_1.Settings.credentials,
             view: Settings_1.Settings.view,
+            translation: Settings_1.Settings.translation,
             timings: Settings_1.Settings.timings,
             update: Settings_1.Settings.update
         }));

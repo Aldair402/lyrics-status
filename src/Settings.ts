@@ -39,9 +39,13 @@ export class Settings {
     }
 
     public static update = {
-        enableAutoupdate: true,
+        enableAutoupdate: false,
     }
 
+    public static translation = {
+        enableTranslation: false,
+        translationLanguage: "en-US"
+    }
     // ── Persistence ───────────────────────────────────────────────────────────
 
     public static save(): void {
@@ -51,6 +55,7 @@ export class Settings {
                 {
                     credentials: this.credentials,
                     view:        this.view,
+            	    translation: this.translation,
                     timings:     this.timings,
                     update:      this.update,
                 },
@@ -79,6 +84,7 @@ export class Settings {
         }
 
         if (saved.view)    this.view    = { ...this.view,    ...(saved.view    as typeof this.view)    }
+        if (saved.translation)    this.translation    = { ...this.translation,    ...(saved.translation    as typeof this.translation)    }
         if (saved.timings) this.timings = { ...this.timings, ...(saved.timings as typeof this.timings) }
         if (saved.update)  this.update  = { ...this.update,  ...(saved.update  as typeof this.update)  }
     }

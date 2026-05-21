@@ -14,6 +14,7 @@ class Settings {
         (0, node_fs_1.writeFileSync)("./settings.json", JSON.stringify({
             credentials: this.credentials,
             view: this.view,
+            translation: this.translation,
             timings: this.timings,
             update: this.update,
         }, null, 2));
@@ -37,6 +38,8 @@ class Settings {
         }
         if (saved.view)
             this.view = Object.assign(Object.assign({}, this.view), saved.view);
+        if (saved.translation)
+            this.translation = Object.assign(Object.assign({}, this.translation), saved.translation);
         if (saved.timings)
             this.timings = Object.assign(Object.assign({}, this.timings), saved.timings);
         if (saved.update)
@@ -72,5 +75,9 @@ Settings.timings = {
     autooffset: 3,
 };
 Settings.update = {
-    enableAutoupdate: true,
+    enableAutoupdate: false,
+};
+Settings.translation = {
+    enableTranslation: false,
+    translationLanguage: "en-US"
 };

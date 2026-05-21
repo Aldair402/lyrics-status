@@ -26,6 +26,29 @@ if (Settings.update.enableAutoupdate) {
     init()
 }
 
+export async function handleTranslation(playbackState: PlaybackState): Promise<void> {
+    const line = playbackState.currentLine as { text?: string; textTranslated?: string }
+
+    if (
+        line &&
+        line.text &&
+        Settings.translation?.enableTranslation &&
+        !line.textTranslated
+    ) {
+        try {
+            const { translateLyrics } = await import("./Translate")
+            const translated = await translateLyrics(
+                line.text,
+                Settings.translation.translationLanguage
+            )
+            line.textTranslated = translated
+        } catch (err) {
+            console.error("Error translating lyrics:", err)
+        }
+    }
+}
+
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 function init(): void {
@@ -61,13 +84,13 @@ function init(): void {
         statusChanger.changeStatus()
 
         if (playbackState.ended) statusChanger.songChanged()
-
+        handleTranslation(playbackState) // Para ver primero si termino la cancion y no traducir
         console.clear()
         console.log(
             `  Song:    ${playbackState.songName   || "—"}\n` +
             `  Artist:  ${playbackState.songAuthor || "—"}\n` +
             `  Time:    ${statusChanger.formatSeconds(Math.floor(playbackState.songProgress / 1000))}\n` +
-            `  Lyrics:  ${playbackState.currentLine?.text ?? "—"}\n` +
+            `  Lyrics:  ${playbackState.currentLine ? (playbackState.currentLine.textTranslated || playbackState.currentLine.text) : "—"}\n` +
             `  Source:  ${lyricsFetcher.lastFetchedFrom}`
         )
     }, 1000 / 60)

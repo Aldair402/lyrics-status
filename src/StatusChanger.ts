@@ -2,6 +2,7 @@ import { PlaybackState } from "./PlaybackState"
 import { Settings } from "./Settings"
 import { LyricsLine } from "./Sources/BaseSource"
 import { Autooffset } from "./Autooffset"
+import { translateLyrics } from "./Translate"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -19,7 +20,6 @@ const STATUS_TTL_MS      = 60_000
 export class StatusChanger {
     public readonly playbackState: PlaybackState
     public readonly autooffset: Autooffset
-
     /** Lines already sent in the current song — prevents duplicate requests. */
     private sentLines: LyricsLine[] = []
 
@@ -38,12 +38,12 @@ export class StatusChanger {
             method: "PATCH",
             headers: {
                 "Content-Type": "application/json",
-                Authorization:  Settings.credentials.token,
+                Authorization: Settings.credentials.token,
             },
             body: JSON.stringify({
                 custom_status: {
                     text,
-                    emoji_id:   null,
+                    emoji_id: null,
                     emoji_name: emoji || null,
                     expires_at: new Date(sentAt + STATUS_TTL_MS).toISOString(),
                 },
@@ -60,7 +60,7 @@ export class StatusChanger {
         const parts: string[] = []
 
         if (Settings.view.timestamp) parts.push(`[${timestamp}]`)
-        if (Settings.view.label)     parts.push("Song lyrics -")
+        if (Settings.view.label) parts.push("Song lyrics -")
 
         parts.push(line.text.replace("♪", "🎶"))
 
@@ -78,28 +78,28 @@ export class StatusChanger {
 
         if (!line) return template.slice(0, MAX_STATUS_LENGTH)
 
-        const timestamp  = this.formatSeconds(+(line.time / 1000).toFixed(0))
-        const cropped    = (s: string) => s.replace(/( ?- ?.+)|(\(.+\))/gi, "")
+        const timestamp   = this.formatSeconds(+(line.time / 1000).toFixed(0))
+        const cropped     = (s: string) => s.replace(/( ?- ?.+)|(\(.+\))/gi, "")
         const lettersOnly = (s: string) => s.replace(/['",\.]/gi, "")
 
         return template
-            .replace("{lyrics}",                    line.text)
-            .replace("{lyrics_upper}",              line.text.toUpperCase())
-            .replace("{lyrics_lower}",              line.text.toLowerCase())
-            .replace("{lyrics_letters_only}",       lettersOnly(line.text))
+            .replace("{lyrics}", line.text)
+            .replace("{lyrics_upper}", line.text.toUpperCase())
+            .replace("{lyrics_lower}", line.text.toLowerCase())
+            .replace("{lyrics_letters_only}", lettersOnly(line.text))
             .replace("{lyrics_upper_letters_only}", lettersOnly(line.text.toUpperCase()))
             .replace("{lyrics_lower_letters_only}", lettersOnly(line.text.toLowerCase()))
-            .replace("♪",                           "🎶")
-            .replace("{timestamp}",                 timestamp)
-            .replace("{song_name}",                 songName)
-            .replace("{song_name_upper}",           songName.toUpperCase())
-            .replace("{song_name_lower}",           songName.toLowerCase())
-            .replace("{song_name_cropped}",         cropped(songName))
-            .replace("{song_name_upper_cropped}",   cropped(songName.toUpperCase()))
-            .replace("{song_name_lower_cropped}",   cropped(songName.toLowerCase()))
-            .replace("{song_author}",               songAuthor)
-            .replace("{song_author_upper}",         songAuthor.toUpperCase())
-            .replace("{song_author_lower}",         songAuthor.toLowerCase())
+            .replace("♪", "🎶")
+            .replace("{timestamp}", timestamp)
+            .replace("{song_name}", songName)
+            .replace("{song_name_upper}", songName.toUpperCase())
+            .replace("{song_name_lower}", songName.toLowerCase())
+            .replace("{song_name_cropped}", cropped(songName))
+            .replace("{song_name_upper_cropped}", cropped(songName.toUpperCase()))
+            .replace("{song_name_lower_cropped}", cropped(songName.toLowerCase()))
+            .replace("{song_author}", songAuthor)
+            .replace("{song_author_upper}", songAuthor.toUpperCase())
+            .replace("{song_author_lower}", songAuthor.toLowerCase())
             .slice(0, MAX_STATUS_LENGTH)
     }
 
@@ -109,7 +109,7 @@ export class StatusChanger {
      * Should be called on every frame (~60 fps). Checks whether the playback
      * position has crossed a new lyrics line and fires a status update if so.
      */
-    public changeStatus(): void {
+    public async changeStatus(): Promise<void> {
         this.autooffset.setLimit(Settings.timings.autooffset)
 
         const { playbackState } = this
@@ -140,17 +140,22 @@ export class StatusChanger {
             playbackState.currentLine = line
             this.sentLines.push(line)
 
-            if (Settings.view.advanced.enabled) {
-                this.sendStatusRequest(
-                    this.buildAdvancedStatus(Settings.view.advanced.customStatus),
-                    Settings.view.advanced.customEmoji
-                )
-            } else {
-                this.sendStatusRequest(
-                    this.buildSimpleStatus(line),
-                    Settings.view.advanced.customEmoji
+            let statusText = Settings.view.advanced.enabled
+                ? this.buildAdvancedStatus(Settings.view.advanced.customStatus)
+                : this.buildSimpleStatus(line)
+
+            // ── Translation ────────────────────────────────────────────────
+            if (Settings.translation.enableTranslation) {
+                statusText = await translateLyrics(
+                    statusText,
+                    Settings.translation.translationLanguage
                 )
             }
+
+            this.sendStatusRequest(
+                statusText,
+                Settings.view.advanced.customEmoji
+            )
 
             break
         }

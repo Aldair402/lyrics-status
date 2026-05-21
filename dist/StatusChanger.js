@@ -1,8 +1,18 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StatusChanger = void 0;
 const Settings_1 = require("./Settings");
 const Autooffset_1 = require("./Autooffset");
+const Translate_1 = require("./Translate");
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DISCORD_STATUS_API = "https://discordapp.com/api/v8/users/@me/settings";
 const MAX_STATUS_LENGTH = 128;
@@ -93,42 +103,46 @@ class StatusChanger {
      * position has crossed a new lyrics line and fires a status update if so.
      */
     changeStatus() {
-        this.autooffset.setLimit(Settings_1.Settings.timings.autooffset);
-        const { playbackState } = this;
-        if (!playbackState.isPlaying || !playbackState.hasLyrics || playbackState.ended)
-            return;
-        const lyrics = playbackState.lyrics;
-        if (!lyrics)
-            return;
-        const offset = Settings_1.Settings.timings.enableAutooffset
-            ? this.autooffset.getAverageValue() + 100
-            : Settings_1.Settings.timings.sendTimeOffset;
-        const threshold = playbackState.songProgress + offset;
-        for (let i = 0; i < lyrics.lines.length; i++) {
-            const line = lyrics.lines[i];
-            const nextLine = lyrics.lines[i + 1];
-            if (line.time >= threshold)
-                continue;
-            if (!line.text)
-                continue;
-            // Wait until this is the last line that has passed the threshold
-            if (nextLine && nextLine.time < threshold)
-                continue;
-            // Skip if already sent or already the current line
-            if (this.sentLines.some((s) => s.time === line.time))
+        return __awaiter(this, void 0, void 0, function* () {
+            this.autooffset.setLimit(Settings_1.Settings.timings.autooffset);
+            const { playbackState } = this;
+            if (!playbackState.isPlaying || !playbackState.hasLyrics || playbackState.ended)
+                return;
+            const lyrics = playbackState.lyrics;
+            if (!lyrics)
+                return;
+            const offset = Settings_1.Settings.timings.enableAutooffset
+                ? this.autooffset.getAverageValue() + 100
+                : Settings_1.Settings.timings.sendTimeOffset;
+            const threshold = playbackState.songProgress + offset;
+            for (let i = 0; i < lyrics.lines.length; i++) {
+                const line = lyrics.lines[i];
+                const nextLine = lyrics.lines[i + 1];
+                if (line.time >= threshold)
+                    continue;
+                if (!line.text)
+                    continue;
+                // Wait until this is the last line that has passed the threshold
+                if (nextLine && nextLine.time < threshold)
+                    continue;
+                // Skip if already sent or already the current line
+                if (this.sentLines.some((s) => s.time === line.time))
+                    break;
+                if (line === playbackState.currentLine)
+                    break;
+                playbackState.currentLine = line;
+                this.sentLines.push(line);
+                let statusText = Settings_1.Settings.view.advanced.enabled
+                    ? this.buildAdvancedStatus(Settings_1.Settings.view.advanced.customStatus)
+                    : this.buildSimpleStatus(line);
+                // ── Translation ────────────────────────────────────────────────
+                if (Settings_1.Settings.translation.enableTranslation) {
+                    statusText = yield (0, Translate_1.translateLyrics)(statusText, Settings_1.Settings.translation.translationLanguage);
+                }
+                this.sendStatusRequest(statusText, Settings_1.Settings.view.advanced.customEmoji);
                 break;
-            if (line === playbackState.currentLine)
-                break;
-            playbackState.currentLine = line;
-            this.sentLines.push(line);
-            if (Settings_1.Settings.view.advanced.enabled) {
-                this.sendStatusRequest(this.buildAdvancedStatus(Settings_1.Settings.view.advanced.customStatus), Settings_1.Settings.view.advanced.customEmoji);
             }
-            else {
-                this.sendStatusRequest(this.buildSimpleStatus(line), Settings_1.Settings.view.advanced.customEmoji);
-            }
-            break;
-        }
+        });
     }
     /** Call when the song changes to reset the sent-lines tracker. */
     songChanged() {

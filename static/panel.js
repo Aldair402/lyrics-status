@@ -123,6 +123,27 @@ $(`
                     </label>
                 </div>
             </section>
+             <span class="settings-name">Lyrics translation</span>
+            <div class="option">
+            <label for="enable-translation">Enable translation</label>
+            <input type="checkbox" id="enable-translation">
+            </div>
+            <div id="translation-settings">
+            <div class="option">
+            <label for="translation-language">Target language:</label>
+            <select id="translation-language" class="text-input1">
+            <option value="en-US">English</option>
+            <option value="es">Spanish</option>
+            <option value="pt">Portuguese</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="it">Italian</option>
+            <option value="ru">Russian</option>
+            <option value="ja">Japanese</option>
+            <option value="ko">Korean</option>
+            </select>
+            </div>
+            </div>
         </main>
     </div>
 
@@ -253,6 +274,8 @@ let userTokenInput        = $("#user-token"),
     autooffset            = $("#autooffset"),
     autooffsetHelp        = $("#autooffset-help"),
     enableAutoupdate      = $("#enable-autoupdate");
+    enableTranslation       = $("#enable-translation"),
+    translationLanguage     = $("#translation-language")
 
 // ── Settings model ────────────────────────────────────────────────────────────
 let settings = {
@@ -263,10 +286,28 @@ let settings = {
         advanced: { enabled: false, customEmoji: "🎶", customStatus: "[{timestamp}] Song lyrics - {lyrics}" }
     },
     timings:  { sendTimeOffset: 500, enableAutooffset: true, autooffset: 3 },
-    update:   { enableAutoupdate: true }
+    update:   { enableAutoupdate: true },
+    translation: {
+        enableTranslation: false,
+        translationLanguage: "en-US"
+    }
 };
 
 let settingsLoaded = false;
+
+
+enableTranslation.click(() => {
+    let state = enableTranslation.prop("checked");
+    settings.translation.enableTranslation = state;
+    saveSettings();
+});
+
+// Change target language
+translationLanguage.change(() => {
+    let lang = translationLanguage.val();
+    settings.translation.translationLanguage = lang;
+    saveSettings();
+});
 
 // ── Event handlers ────────────────────────────────────────────────────────────
 userTokenInput.change(() => {
@@ -420,6 +461,8 @@ function loadSettings(raw) {
         enableAutooffset.prop("checked", settings.timings.enableAutooffset);
         autooffset.val(settings.timings.autooffset);
         enableAutoupdate.prop("checked", settings.update.enableAutoupdate);
+        enableTranslation.prop("checked", settings.translation.enableTranslation);
+        translationLanguage.val(settings.translation.translationLanguage);
         settingsLoaded = true;
     } catch (e) {
         console.error(e);
