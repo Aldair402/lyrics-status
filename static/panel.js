@@ -67,7 +67,7 @@ $(`
                             Custom emoji
                             <img id="custom-emoji-help" class="clickable question-mark1" src="https://www.pngall.com/wp-content/uploads/5/Help-Question-Mark-PNG-Free-Download.png" height="15" alt="Help">
                         </label>
-                        <input style="width: 60px;" maxlength="4" id="custom-emoji" class="text-input1" placeholder="🎶">
+                        <input style="width: 60px;" maxlength="64" id="custom-emoji" class="text-input1" placeholder="🎶">
                     </div>
 
                     <div class="option form-row">
