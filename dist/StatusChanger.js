@@ -31,9 +31,30 @@ class StatusChanger {
         this.autooffset = new Autooffset_1.Autooffset();
     }
     // ── Private helpers ───────────────────────────────────────────────────────
+    // Before this we export the custom emoji things
+    parseEmoji(emoji) {
+        if (!emoji) {
+            return {
+                emoji_id: null,
+                emoji_name: null,
+            };
+        }
+        const customEmojiMatch = emoji.match(/^<a?:([^:]+):(\d+)>$/);
+        if (customEmojiMatch) {
+            return {
+                emoji_name: customEmojiMatch[1],
+                emoji_id: customEmojiMatch[2],
+            };
+        }
+        return {
+            emoji_name: emoji,
+            emoji_id: null,
+        };
+    }
     /** Sends a PATCH request to update the Discord custom status. */
     sendStatusRequest(text, emoji) {
         const sentAt = Date.now();
+        const parsedEmoji = this.parseEmoji(emoji);
         fetch(DISCORD_STATUS_API, {
             method: "PATCH",
             headers: {
@@ -43,12 +64,17 @@ class StatusChanger {
             body: JSON.stringify({
                 custom_status: {
                     text,
-                    emoji_id: null,
-                    emoji_name: emoji || null,
+                    emoji_id: parsedEmoji.emoji_id,
+                    emoji_name: parsedEmoji.emoji_name,
                     expires_at: new Date(sentAt + STATUS_TTL_MS).toISOString(),
                 },
             }),
-        }).then(() => this.autooffset.addValue(Date.now() - sentAt));
+        })
+            .then((res) => __awaiter(this, void 0, void 0, function* () {
+            console.log("[Discord Status]", res.status, yield res.text());
+            this.autooffset.addValue(Date.now() - sentAt);
+        }))
+            .catch(console.error);
     }
     /**
      * Builds the status text for a lyrics line using the simple format

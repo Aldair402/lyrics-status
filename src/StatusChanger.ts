@@ -29,28 +29,64 @@ export class StatusChanger {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+    // Before this we export the custom emoji things
+    private parseEmoji(emoji: string): {
+       emoji_id: string | null
+       emoji_name: string | null
+    } {
+       if (!emoji) {
+           return {
+               emoji_id: null,
+               emoji_name: null,
+           }
+       }
+       const customEmojiMatch = emoji.match(/^<a?:([^:]+):(\d+)>$/)
+       if (customEmojiMatch) {
+           return {
+               emoji_name: customEmojiMatch[1],
+               emoji_id: customEmojiMatch[2],
+           }
+       }
 
-    /** Sends a PATCH request to update the Discord custom status. */
-    private sendStatusRequest(text: string, emoji: string): void {
-        const sentAt = Date.now()
-
-        fetch(DISCORD_STATUS_API, {
-            method: "PATCH",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: Settings.credentials.token,
-            },
-            body: JSON.stringify({
-                custom_status: {
-                    text,
-                    emoji_id: null,
-                    emoji_name: emoji || null,
-                    expires_at: new Date(sentAt + STATUS_TTL_MS).toISOString(),
-                },
-            }),
-        }).then(() => this.autooffset.addValue(Date.now() - sentAt))
+        return {
+           emoji_name: emoji,
+           emoji_id: null,
+        }
     }
+    /** Sends a PATCH request to update the Discord custom status. */
+private sendStatusRequest(text: string, emoji: string): void {
+    const sentAt = Date.now()
 
+    const parsedEmoji = this.parseEmoji(emoji)
+
+    fetch(DISCORD_STATUS_API, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: Settings.credentials.token,
+        },
+        body: JSON.stringify({
+            custom_status: {
+                text,
+                emoji_id: parsedEmoji.emoji_id,
+                emoji_name: parsedEmoji.emoji_name,
+                expires_at: new Date(
+                    sentAt + STATUS_TTL_MS
+                ).toISOString(),
+            },
+        }),
+    })
+        .then(async (res) => {
+            console.log(
+                "[Discord Status]",
+                res.status,
+                await res.text()
+            )
+
+            this.autooffset.addValue(Date.now() - sentAt)
+        })
+        .catch(console.error)
+     }
     /**
      * Builds the status text for a lyrics line using the simple format
      * (timestamp + label + lyrics text).
