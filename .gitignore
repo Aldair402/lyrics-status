@@ -1,8 +1,8 @@
-/cache/
-/node_modules/
+/target
+/cache
 /settings.json
-/package-lock.json
-/.idea/
-/src/backup/
 /log.txt
-**/.DS_Store
+/temp
+*.log
+.env
+.DS_Store

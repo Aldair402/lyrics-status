@@ -1,103 +1,81 @@
-# LyricsStatus V3
+# LyricsStatus (Rust)
 
-## What is it?
+LyricsStatus cambia el estado personalizado de Discord, línea por línea, usando la letra sincronizada de la canción que se está reproduciendo en Spotify.
 
-LyricsStatus is a tool that changes your Discord custom status to the synced lyrics of the song you're currently listening to on Spotify.
+El backend ha sido reescrito completamente en Rust. No requiere Node.js, una cuenta de desarrollador de Spotify, OAuth propio ni cookies: obtiene el acceso de Spotify desde la conexión que ya existe en Discord.
 
-It is written in TypeScript and runs on Node.js. No Spotify developer account, no OAuth setup, no cookies — just your Discord token.
+> **Aviso:** el programa utiliza el token de usuario de Discord. Este se guarda únicamente en `settings.json` en tu equipo, pero automatizar una cuenta puede incumplir los términos de Discord. Úsalo bajo tu propia responsabilidad y nunca compartas el token.
 
-## How it works
+## Requisitos
 
-LyricsStatus fetches your current Spotify playback state using the Spotify access token that Discord already holds internally (from your connected Spotify account). It then fetches synced lyrics from free sources and updates your Discord custom status line by line in real time.
+- [Rust](https://rustup.rs/) estable (1.80 o posterior)
+- Una cuenta de Discord con Spotify conectado (Ajustes → Conexiones)
+- Spotify reproduciendo música en cualquier dispositivo
 
-## Precautions
+## Compilar
 
-This tool is provided "AS IS" without any warranty that it will work on your machine.
-
-The creator of LyricsStatus is not responsible for any consequences that may arise from its use.
-
-By using it, you agree with the statements above.
-
-## Requirements
-
-- [Node.js](https://nodejs.org/en) v17 or higher
-- A Discord account with **Spotify connected** (Settings → Connections)
-- Spotify playing on any device
-
-## Setup
-
-### 1. Download
-
-Clone the repo or download the source archive from [Releases](https://github.com/OvalQuilter/lyrics-status/releases):
-
-```
-git clone https://github.com/OvalQuilter/lyrics-status
+```bash
+cargo build --release
 ```
 
-### 2. Install dependencies
+El ejecutable se crea en:
 
-```
-npm install
-```
+- Linux/macOS: `target/release/lyrics-status`
+- Windows: `target\release\lyrics-status.exe`
 
-### 3. Build
+## Ejecutar
 
-```
-npm run build
-```
-
-### 4. Run
-
-```
-npm start
+```bash
+cargo run --release
 ```
 
-### 5. Configure
+Después abre [http://localhost:8999](http://localhost:8999). El servidor solo escucha en `127.0.0.1`, por lo que el panel no se expone a la red local.
 
-Open `http://localhost:8999` in your browser. You'll see the settings panel.
+## Configuración
 
-**Discord token** — the only credential you need. Here's [a video](https://www.youtube.com/watch?v=LnBnm_tZlyU) showing how to get it. Paste it into the Discord token field and click Check to verify it works.
+El panel conserva el formato de `settings.json` de la versión TypeScript, incluidos:
 
-That's it. Play a song on Spotify and your Discord status will start updating with synced lyrics within a few seconds.
+- token y UUID local;
+- marca de tiempo y etiqueta del estado;
+- plantilla avanzada y emoji Unicode o personalizado;
+- desfase fijo o cálculo automático por latencia;
+- traducción opcional mediante Google Translate;
+- comprobación de actualizaciones.
 
-## Settings
+Las plantillas avanzadas admiten `{lyrics}`, sus variantes en mayúsculas/minúsculas y solo letras, `{timestamp}`, `{song_name}`, sus variantes recortadas, y `{song_author}`. El resultado se limita a 128 caracteres Unicode.
 
-| Setting | Description |
-|---|---|
-| Discord token | Your Discord user token. Used to read your Spotify connection and update your status. |
-| Show playback timestamp | Prepends `[m:ss]` to the status text. |
-| Show label | Prepends `Song lyrics -` to the status text. |
-| Custom status template | Advanced mode — build your own status string using placeholders (see below). |
-| Send time offset | How many ms ahead of the lyric timestamp to send the status update. Default 500. |
-| Autooffset | Automatically calculates the offset based on Discord API response times. |
+## Fuentes de letras
 
-### Custom status placeholders
+Se consultan en orden hasta encontrar letras sincronizadas:
 
-`{lyrics}`, `{lyrics_upper}`, `{lyrics_lower}`, `{lyrics_letters_only}`  
-`{song_name}`, `{song_name_cropped}`, `{song_name_upper}`, `{song_name_lower}`  
-`{song_author}`, `{song_author_upper}`, `{song_author_lower}`  
-`{timestamp}`
+1. LrcLib
+2. NetEase Music
+3. QQ Music
 
-Status text is automatically cropped to 128 characters (Discord's limit).
+Las respuestas se guardan en `cache/` con nombres SHA-256 seguros. Las canciones repetidas no generan nuevas consultas a los proveedores.
 
-## Lyrics sources
+## Arquitectura
 
-Lyrics are fetched in this order, falling back to the next if one fails:
+- `src/main.rs`: inicialización y tareas asíncronas.
+- `src/spotify.rs`: estado de reproducción mediante Discord/Spotify.
+- `src/status.rs`: sincronización, plantillas, emojis y estado de Discord.
+- `src/sources/`: proveedores de letras y analizador LRC compartido.
+- `src/lyrics_fetcher.rs`: fallback entre proveedores y caché.
+- `src/server.rs`: panel HTTP y configuración por WebSocket.
+- `src/settings.rs`: configuración compatible y persistencia.
+- `src/translation.rs`: traducción y caché en memoria.
 
-1. **LrcLib** — best coverage for synced LRC lyrics
-2. **NetEase Music** — large catalogue, good for non-English tracks
-3. **QQ Music** — last resort fallback
+## Pruebas
 
-Fetched lyrics are cached locally in `./cache/` to avoid redundant requests.
+```bash
+cargo test
+cargo clippy --all-targets --all-features -- -D warnings
+cargo fmt --check
+```
 
-## Troubleshooting
+## Solución de problemas
 
-**Status not updating** — make sure Spotify is connected to your Discord account under Settings → Connections, and that you have a song actively playing (not paused).
-
-**Token invalid** — use the Check button in the settings panel to verify your Discord token is correct.
-
-**No lyrics found** — the song may not be in any of the lyrics databases, or only has unsynced lyrics. LyricsStatus requires time-synced lyrics to work.
-
-**Windows** — try running the command prompt with administrator privileges or temporarily disabling your firewall.
-
-**Linux** — try running the terminal as root if you hit permission issues.
+- **No cambia el estado:** comprueba el token en el panel y confirma que Spotify está conectado a Discord.
+- **No detecta reproducción:** debe existir un dispositivo activo y la canción no debe estar pausada.
+- **No encuentra letras:** la canción puede no tener letras sincronizadas en ninguno de los tres proveedores.
+- **El puerto está ocupado:** cierra el proceso que usa `127.0.0.1:8999` antes de iniciar LyricsStatus.
