@@ -9,13 +9,25 @@ mod translation;
 
 use crate::{lyrics_fetcher::LyricsFetcher, models::PlaybackState, settings::Settings, sources::{LrcLib, LyricsSource, NetEase, QqMusic}, translation::Translator};
 use anyhow::Context;
-use std::{sync::Arc, time::Duration};
+use std::{
+    io::{self, IsTerminal, Write},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::sync::RwLock;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt().with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("lyrics_status=info"))).init();
+    tracing_subscriber::fmt()
+        .compact()
+        .without_time()
+        .with_target(false)
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("lyrics_status=info")),
+        )
+        .init();
     let client = reqwest::Client::builder().user_agent(concat!("LyricsStatus/", env!("CARGO_PKG_VERSION")))
         .timeout(Duration::from_secs(15)).build().context("could not create HTTP client")?;
     let mut loaded = Settings::load("settings.json").await;
@@ -39,13 +51,47 @@ async fn main() -> anyhow::Result<()> {
 
 async fn display(playback: Arc<RwLock<PlaybackState>>, source: Arc<RwLock<String>>) {
     let mut interval = tokio::time::interval(Duration::from_secs(1));
+    let interactive = io::stdout().is_terminal();
+
     loop {
         interval.tick().await;
+
         let state = playback.read().await.clone();
         let source = source.read().await.clone();
-        let lyric = state.current_line.as_ref().map(|line| line.text.as_str()).unwrap_or("—");
-        tracing::info!(song = %if state.song_name.is_empty() { "—" } else { &state.song_name }, artist = %if state.song_author.is_empty() { "—" } else { &state.song_author }, time = %status::format_seconds(state.song_progress / 1000), lyrics = %lyric, source = %source, "playback");
+        let song = value_or_placeholder(&state.song_name);
+        let artist = value_or_placeholder(&state.song_author);
+        let lyric = state
+            .current_line
+            .as_ref()
+            .map(|line| value_or_placeholder(&line.text))
+            .unwrap_or("—");
+        let playback_status = if state.is_playing { "Reproduciendo" } else { "En espera" };
+        let elapsed = status::format_seconds(state.song_progress / 1000);
+        let duration = status::format_seconds(state.song_duration / 1000);
+
+        if interactive {
+            let mut stdout = io::stdout().lock();
+            let _ = write!(
+                stdout,
+                "\x1b[2J\x1b[H\
+                 \x1b[1;36mLyricsStatus\x1b[0m  ·  {playback_status}\n\
+                 \x1b[90m────────────────────────────────────────────────────────\x1b[0m\n\
+                 \x1b[1mCanción\x1b[0m   {song}\n\
+                 \x1b[1mArtista\x1b[0m   {artist}\n\
+                 \x1b[1mTiempo\x1b[0m    {elapsed} / {duration}\n\
+                 \x1b[1mLetra\x1b[0m     {lyric}\n\
+                 \x1b[1mFuente\x1b[0m    {source}\n\n\
+                 \x1b[90mPanel: http://localhost:8999\x1b[0m\n"
+            );
+            let _ = stdout.flush();
+        } else {
+            println!("{playback_status} · {song} — {artist} · {elapsed}/{duration} · {lyric} [{source}]");
+        }
     }
+}
+
+fn value_or_placeholder(value: &str) -> &str {
+    if value.is_empty() { "—" } else { value }
 }
 async fn check_update(client: reqwest::Client) {
     let result = async {
